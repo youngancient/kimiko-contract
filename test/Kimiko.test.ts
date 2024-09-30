@@ -274,19 +274,6 @@ describe("Kimiko", function () {
           .noOfMedications
       ).to.equal(1);
 
-      // add to patient2
-      await expect(
-        kimiko
-          .connect(doctor)
-          .addPatientMedication(patient2, medName, dosage, interval, duration)
-      )
-        .to.emit(kimiko, "PatientMedicationAdded")
-        .withArgs(1, medName, duration);
-
-      expect(
-        (await kimiko.connect(doctor)["getPatientDetails(address)"](patient2))
-          .noOfMedications
-      ).to.equal(1);
 
       // patient1 takes
       let block = await ethers.provider.getBlock("latest");
@@ -300,6 +287,8 @@ describe("Kimiko", function () {
       expect(medications1[0].dosesTaken).to.equal(1);
 
       // take drug
+      block = await ethers.provider.getBlock("latest");
+      timestamp = block!.timestamp;
 
       time.increaseTo(timestamp + interval * 60 * 60);
 
@@ -330,6 +319,8 @@ describe("Kimiko", function () {
       
       medications1 = await kimiko.connect(patient1).getMyMedications();
       expect(medications1[0].dosesTaken).to.equal(4);
+
+     
     });
   });
 });

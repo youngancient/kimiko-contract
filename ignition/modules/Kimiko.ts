@@ -3,8 +3,10 @@
 
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
+const tokenAddress = "";
+
 const KimikoModule = buildModule("KimikoModule", (m) => {
-  const kimiko = m.contract("Kimiko");
+  const kimiko = m.contract("Kimiko", [tokenAddress]);
 
   return { kimiko };
 });
