@@ -1,13 +1,13 @@
-# Sample Hardhat Project
+# Kimiko: Onchain Medical Adherence System
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a Hardhat Ignition module that deploys that contract.
+## Overview
 
-Try running some of the following tasks:
+Kimiko is an on-chain medical adherence system designed to help patients manage medications. Adhering to medications, tracking doctor visits, and maintaining lifestyle changes can be overwhelming, but Kimiko aims to simplify this process by rewarding patients who stay on track with their health. Patients can also decide to share these rewards with others.
 
-```shell
-npx hardhat help
-npx hardhat test
-REPORT_GAS=true npx hardhat test
-npx hardhat node
-npx hardhat ignition deploy ./ignition/modules/Lock.ts
-```
+With Kimiko, patients earn **tokens** and unlock **exclusive NFTs** as they follow their prescribed treatment plans, making healthcare adherence fun and rewarding!
+
+- Kimiko Contract Code: https://github.com/youngancient/kimiko-contract
+- Scroll Alchemy RPC URL usage in Hardhat config: https://github.com/youngancient/kimiko-contract/blob/main/hardhat.config.ts
+- Verified contract deployment: https://sepolia.scrollscan.com//address/0x8251aEA64aa7d28B9f536f7eb1E1db0BbC8b6386#code
+
+- Kimitoken contract deployment:  https://sepolia.scrollscan.com//address/0x437e05E34AA72700773DDA2dd97cc64a1Deb2A93#code
