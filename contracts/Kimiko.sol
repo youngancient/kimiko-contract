@@ -24,8 +24,8 @@ contract Kimiko {
         string specialty;
     }
 
-    uint256 noOfDoctors;
-    uint256 noOfPatients;
+    uint256 public noOfDoctors;
+    uint256 public noOfPatients;
 
     struct Patient {
         uint256 id;
@@ -36,6 +36,7 @@ contract Kimiko {
         Medication[] medications;
         Role role;
         address beneficiary;
+        uint256 claimedRewards;
     }
 
     struct Medication {
@@ -103,6 +104,10 @@ contract Kimiko {
         }
     }
 
+    function getTokenAddress() external view returns (address) {
+        return tokenAddress;
+    }
+
     // @dev: doctor external functions
     function addDoctor(string memory _name, string memory _specialty) external {
         _sanityCheck(msg.sender);
@@ -115,6 +120,8 @@ contract Kimiko {
 
         emit Events.DoctorAddedSuccessfully(_id, _name, msg.sender);
     }
+
+    //@dev: for doctors
 
     function addPatient(string memory _name, address _address) external {
         _sanityCheck(_address);
@@ -131,7 +138,6 @@ contract Kimiko {
         patient.doctor = msg.sender;
         patient.role = Role.Novice;
         patient.beneficiary = _address;
-    
 
         addressToPatient[_address] = patient;
         doctorToPatientAddress[msg.sender].push(_address);
@@ -177,14 +183,37 @@ contract Kimiko {
         return doctorToPatientAddress[msg.sender];
     }
 
-    //@dev: for doctors
     function getPatientDetails(
         address _address
     ) external view returns (Patient memory) {
         _sanityCheck(msg.sender);
         _sanityCheck(_address);
-        _isDoctor(msg.sender);
+        _onlyDoctor(msg.sender);
+
+        if (!_isPatient(_address)) {
+            revert Errors.NotAPatient();
+        }
+
         return addressToPatient[_address];
+    }
+
+    function getPatientMedications(
+        address _address
+    ) external view returns (Medication[] memory) {
+        _sanityCheck(msg.sender);
+        _onlyDoctor(msg.sender);
+
+        if (!_isPatient(_address)) {
+            revert Errors.NotAPatient();
+        }
+        return addressToPatient[msg.sender].medications;
+    }
+
+    function getDoctorDetails() external view returns (Doctor memory) {
+        _sanityCheck(msg.sender);
+        _onlyDoctor(msg.sender);
+
+        return addressToDoctor[msg.sender];
     }
 
     // @dev: only patient functions
@@ -192,22 +221,22 @@ contract Kimiko {
     function getMyMedications() external view returns (Medication[] memory) {
         _sanityCheck(msg.sender);
         // should
-        if (_isPatient(msg.sender)) {
-            revert Errors.NotAPatient();
-        }
+        _onlyPatient(msg.sender);
+
         return addressToPatient[msg.sender].medications;
     }
 
     function getPatientDetails() external view returns (Patient memory) {
         _sanityCheck(msg.sender);
-        _isPatient(msg.sender);
+        _onlyPatient(msg.sender);
         return addressToPatient[msg.sender];
     }
 
     function setBeneficiary(address _address) external {
         _sanityCheck(msg.sender);
         _sanityCheck(_address);
-        _isPatient(msg.sender);
+
+        _onlyPatient(msg.sender);
         addressToPatient[msg.sender].beneficiary = _address;
 
         emit Events.BeneficiaryAdded(_address);
@@ -215,8 +244,9 @@ contract Kimiko {
 
     function takeMedication(uint256 _medicationId) external {
         _sanityCheck(msg.sender);
-        _isPatient(msg.sender);
+        _onlyPatient(msg.sender);
         Patient storage patient = addressToPatient[msg.sender];
+
         if (_medicationId == 0 || _medicationId > patient.noOfMedications) {
             revert Errors.InvalidMedicationID();
         }
@@ -230,6 +260,15 @@ contract Kimiko {
             revert Errors.MedicationDurationEnded();
         }
         uint256 currentTime = block.timestamp;
+
+        // Check if the interval has passed since the last time the medication was taken
+        if (
+            currentTime <
+            medication.lastTimeTaken + (medication.interval * 1 hours)
+        ) {
+            revert Errors.MedicationIntervalNotMet(); // Custom error for interval not being met
+        }
+
         if (
             currentTime >=
             (medication.startTime + (medication.duration * 1 days))
@@ -242,13 +281,28 @@ contract Kimiko {
         medication.dosesTaken++;
 
         patient.adherenceScore += 2; // Increase adherence score per dose
+        uint256 score = patient.adherenceScore;
+
+        if (score >= 200) {
+            patient.role = Role.Champ;
+        } else if (score >= 128) {
+            patient.role = Role.TopGun;
+        } else if (score >= 64) {
+            patient.role = Role.Consistent;
+        } else if (score >= 32) {
+            patient.role = Role.Active;
+        }
 
         // Check if all doses have been taken
         if (medication.dosesTaken >= medication.totalDoses) {
             medication.isCompleted = true; // Mark the medication as completed
             patientToReward[msg.sender] += 10; // Award 10 KMK for completing medication
 
-            emit Events.MedicationCompleted(_medicationId,msg.sender,currentTime);
+            emit Events.MedicationCompleted(
+                _medicationId,
+                msg.sender,
+                currentTime
+            );
         }
 
         emit Events.MedicationTaken(_medicationId, msg.sender, currentTime);
@@ -259,7 +313,8 @@ contract Kimiko {
 
     function claimReward() external {
         _sanityCheck(msg.sender);
-        _isPatient(msg.sender);
+        _onlyPatient(msg.sender);
+
         uint256 _rewardBal = patientToReward[msg.sender];
 
         if (_rewardBal <= 0) {
@@ -268,7 +323,10 @@ contract Kimiko {
 
         Patient memory patient = addressToPatient[msg.sender];
 
+        addressToPatient[msg.sender].claimedRewards = _rewardBal;
+
         patientToReward[msg.sender] = 0;
+
         if (!IERC20(tokenAddress).transfer(patient.beneficiary, _rewardBal)) {
             revert Errors.TransferFailed();
         }
@@ -276,9 +334,13 @@ contract Kimiko {
         emit Events.RewardSent(patient.beneficiary, _rewardBal);
     }
 
-    function getPatientReward() external view returns (uint256) {
+    function getPatientReward() external view returns (uint256, uint256) {
         _sanityCheck(msg.sender);
-        _isPatient(msg.sender);
-        return patientToReward[msg.sender];
+        _onlyPatient(msg.sender);
+
+        uint256 currentRewardBal = patientToReward[msg.sender];
+        uint256 claimedReward = addressToPatient[msg.sender].claimedRewards;
+
+        return (currentRewardBal, claimedReward);
     }
 }

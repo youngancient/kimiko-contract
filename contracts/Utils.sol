@@ -13,6 +13,7 @@ library Errors {
     error IntervalNotMet();
     error TransferFailed();
     error ZeroRewardFound();
+    error MedicationIntervalNotMet();
 }
 
 library Events {
